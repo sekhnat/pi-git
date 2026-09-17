@@ -6,8 +6,9 @@
  */
 
 import { ToolError } from "../../errors.ts";
-import { configGet, currentBranch, push, refExists, remoteUrl } from "../../git/repo.ts";
+import { configGet, currentBranch, push, refExists, remoteUrl, resolveRef } from "../../git/repo.ts";
 import { buildTextResult, pushLine, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, prPushJsonPayload } from "../json.ts";
 import { normalizeOptionalString, requireCurrentGitBranch } from "../refs.ts";
 import { requireGitRepoRoot, toLocalBranchRef } from "./pr-checkout.ts";
 import type { GithubInput } from "../types.ts";
@@ -94,12 +95,30 @@ export async function executePrPush(
 	const refspec = `${sourceRef}:refs/heads/${target.remoteBranch}`;
 	await push(repoRoot, { refspec, remote: target.remoteName, forceWithLease: params.forceWithLease }, signal);
 
+	const resolvedRemoteUrl = (await remoteUrl(repoRoot, target.remoteName, signal)) ?? undefined;
+	if (params.format === "json") {
+		// Post-push resolution: the pushed local branch now points at the pushed SHA.
+		const headSha = (await resolveRef(repoRoot, toLocalBranchRef(localBranch), signal)) ?? undefined;
+		return buildJsonResult("pr_push", {
+			data: prPushJsonPayload({
+				remote: target.remoteName,
+				remoteBranch: target.remoteBranch,
+				remoteUrl: resolvedRemoteUrl,
+				prUrl: target.prUrl,
+				maintainerCanModify: target.maintainerCanModify,
+				isCrossRepository: target.isCrossRepository,
+				headSha,
+			}),
+			details: { branch: localBranch, remote: target.remoteName, remoteBranch: target.remoteBranch },
+			sourceUrl: target.prUrl,
+		});
+	}
 	return buildTextResult(
 		formatPrPushResult({
 			localBranch,
 			remoteName: target.remoteName,
 			remoteBranch: target.remoteBranch,
-			remoteUrl: (await remoteUrl(repoRoot, target.remoteName, signal)) ?? undefined,
+			remoteUrl: resolvedRemoteUrl,
 			prUrl: target.prUrl,
 			forceWithLease: params.forceWithLease ?? false,
 		}),

@@ -1,0 +1,44 @@
+{
+  "leg_d": {
+    "flat_schema_json_chars": 1803,
+    "slim_union_schema_json_chars": 3403,
+    "within_4096_cap": true
+  },
+  "leg_a_slim": {
+    "valid_pr_checkout": {
+      "ok": true
+    },
+    "missing_required_pr": {
+      "ok": false,
+      "message": "- op: must be equal to constant"
+    },
+    "missing_required_path": {
+      "ok": false,
+      "message": "- op: must be equal to constant"
+    },
+    "missing_required_query": {
+      "ok": false,
+      "message": "- op: must be equal to constant"
+    },
+    "unknown_op": {
+      "ok": false,
+      "message": "- op: must be equal to constant"
+    }
+  },
+  "leg_b_slim": {
+    "declaration_chars": 2027,
+    "renders_real_ts_union": true,
+    "member_count": 11
+  },
+  "leg_c_slim": {
+    "check_time_failure": true,
+    "error_count": 4,
+    "errors": [
+      ".scratch/fabric-compat/spike/probe-union-slim.ts(4,40): error TS2322: Type 'number' is not assignable to type 'string | string[]'.",
+      ".scratch/fabric-compat/spike/probe-union-slim.ts(8,19): error TS2345: Argument of type '{ op: \"pr_checkout\"; }' is not assignable to parameter of type '{ [key: string]: unknown; branch?: string | undefined; format?: \"text\" | \"json\" | undefined; op: \"repo_view\"; repo?: string | undefined; } | { [key: string]: unknown; branch?: string | undefined; format?: \"text\" | ... 1 more ... | undefined; op: \"file_read\"; path: string; repo?: string | undefined; } | ... 9 more .....'.",
+      ".scratch/fabric-compat/spike/probe-union-slim.ts(9,19): error TS2345: Argument of type '{ op: \"file_read\"; repo: string; }' is not assignable to parameter of type '{ [key: string]: unknown; branch?: string | undefined; format?: \"text\" | \"json\" | undefined; op: \"repo_view\"; repo?: string | undefined; } | { [key: string]: unknown; branch?: string | undefined; format?: \"text\" | ... 1 more ... | undefined; op: \"file_read\"; path: string; repo?: string | undefined; } | ... 9 more .....'.",
+      ".scratch/fabric-compat/spike/probe-union-slim.ts(10,19): error TS2345: Argument of type '{ op: \"search_code\"; repo: string; }' is not assignable to parameter of type '{ [key: string]: unknown; branch?: string | undefined; format?: \"text\" | \"json\" | undefined; op: \"repo_view\"; repo?: string | undefined; } | { [key: string]: unknown; branch?: string | undefined; format?: \"text\" | ... 1 more ... | undefined; op: \"file_read\"; path: string; repo?: string | undefined; } | ... 9 more .....'."
+    ],
+    "note": "errors should sit on the three missing-required lines (8-10 of probe-union-slim.ts), not the valid lines (4-6)"
+  }
+}

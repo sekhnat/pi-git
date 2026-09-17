@@ -33,6 +33,23 @@ Select an operation via `op`:
 
 `repo` takes `[host/]owner/repo` — qualify the host for GitHub Enterprise. Errors surface gh's own hints (`gh auth login`, missing repo context) instead of raw output.
 
+### JSON output
+
+Every op accepts `format: "json"`, returning one compact `{ "op", "repo"?, "data" }` envelope on the content channel instead of rendered text — `repo` is the explicit or op-resolved `owner/repo`, omitted when unknown. Payloads reuse the exact internal shapes the text renderers consume (`GhRepoViewData`, normalized search items, checkout summaries, …); `details` stays populated identically in both modes, and failures surface as tool errors in both. Omitted or `"text"` output is unchanged (ADR-0007). `file_read` in json mode is text-only: images and non-UTF-8 files fail with an error naming the file.
+
+## The `pi-git` skill
+
+The package ships a `pi-git` skill (declared via `"pi": { "skills": ["./skills"] }` in `package.json` — a `pi` manifest present for `extensions` disables the conventional `skills/` auto-discovery, so the entry is explicit). Pi loads it on demand and it steers workflow, not parameters: the PR checkout → worktree → push/create loop, search-qualifier syntax, `run_watch` polling semantics, worktree expectations, the `/commit` flags in one block, and — inside fabric sessions — a preference for the captured `github` tool over shell `gh`. Op tables and per-op parameter rules live only in the tool description (ADR-0006).
+
+## Fabric interop
+
+pi-fabric captures the `github` tool as `extensions.github(...)`, statically type-checked against its schema in full-code mode. In fabric programs:
+
+- Prefer `extensions.github(...)` over `pi.bash` + `gh` — the capture carries the schema, structured `details`, and error shaping.
+- Inspect the live parameter schema with `tools.list` / `tools.describe`.
+- Pass `format: "json"` when a program consumes fields rather than showing prose.
+- The schema is a discriminated per-op union (`op` literal + that op's parameters), so `file_read.path`, `pr_checkout.pr`, and `search_code.query` are required at the schema level (ADR-0008); missing required args are rejected before the executor runs.
+
 ## `/commit`
 
 ```bash
@@ -65,7 +82,7 @@ PI_GIT_SMOKE_MODEL=openrouter/x node tests/debug-agent.ts  # agent event trace
 
 ## Design
 
-Decisions are recorded in `docs/adr/`; the glossary lives in `CONTEXT.md`. Highlights: behavior-level port (ADR-0002), one op-dispatched tool (ADR-0003), nested SDK agent for `/commit` (ADR-0004), confirm gate before writing history (ADR-0005 — a deliberate deviation from upstream). The git TUI and changelog integration are intentionally out of scope (ADR-0001).
+Decisions are recorded in `docs/adr/`; the glossary lives in `CONTEXT.md`. Highlights: behavior-level port (ADR-0002), one op-dispatched tool (ADR-0003), nested SDK agent for `/commit` (ADR-0004), confirm gate before writing history (ADR-0005 — a deliberate deviation from upstream), packaged skill complementing the tool description (ADR-0006), opt-in json envelope (ADR-0007), discriminated per-op schema union (ADR-0008). The git TUI and changelog integration are intentionally out of scope (ADR-0001).
 
 ## License
 

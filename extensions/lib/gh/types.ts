@@ -41,6 +41,7 @@ export interface GithubInput {
 	limit?: number;
 	run?: string;
 	tail?: number;
+	format?: "text" | "json";
 }
 
 // /search/<endpoint> API response shapes (subset).

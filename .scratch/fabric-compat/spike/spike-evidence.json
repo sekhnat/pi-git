@@ -1,0 +1,43 @@
+{
+  "leg_d": {
+    "flat_schema_json_chars": 1803,
+    "union_schema_json_chars": 5654,
+    "delta_chars": 3851,
+    "union_within_4096_captured_source_cap": false,
+    "flat_within_4096_captured_source_cap": true
+  },
+  "leg_a": {
+    "valid_pr_checkout": {
+      "ok": true
+    },
+    "missing_required_pr": {
+      "ok": false,
+      "message": "Validation failed for tool \"github\": |   - op: must be equal to constant |   - path: must have required properties path"
+    },
+    "missing_required_path": {
+      "ok": false,
+      "message": "Validation failed for tool \"github\": |   - op: must be equal to constant |   - path: must have required properties path"
+    },
+    "missing_required_query": {
+      "ok": false,
+      "message": "Validation failed for tool \"github\": |   - op: must be equal to constant |   - path: must have required properties path"
+    },
+    "unknown_op_rejected": {
+      "ok": false,
+      "message": "Validation failed for tool \"github\": |   - op: must be equal to constant |   - path: must have required properties path"
+    },
+    "op_params_ignored_not_enforced_flatstyle": {
+      "ok": true
+    }
+  },
+  "leg_b": {
+    "flat_declaration_chars": 919,
+    "union_declaration_chars": 318,
+    "union_renders_real_ts_union": false,
+    "union_decl_snippet": "0 union members with op literals"
+  },
+  "leg_c": {
+    "check_time_failure": true,
+    "output": ""
+  }
+}

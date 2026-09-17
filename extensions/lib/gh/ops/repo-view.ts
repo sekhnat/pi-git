@@ -7,6 +7,7 @@
 
 import { normalizeOptionalString, normalizeText } from "../refs.ts";
 import { buildTextResult, pushLine, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, repoViewJsonPayload } from "../json.ts";
 import type { GhRepoViewData, GithubInput } from "../types.ts";
 import { ghJson } from "../runner.ts";
 
@@ -69,5 +70,14 @@ export async function executeRepoView(
 	const data = await ghJson<GhRepoViewData>(cwd, args, signal, {
 		repoProvided: Boolean(repo),
 	});
+	if (params.format === "json") {
+		const payload = repoViewJsonPayload(data);
+		return buildJsonResult("repo_view", {
+			data: payload.data,
+			repo: repo ?? payload.repo,
+			details: { repo, branch },
+			sourceUrl: data.url,
+		});
+	}
 	return buildTextResult(formatRepoView(data, { repo, branch }), data.url, { repo, branch });
 }

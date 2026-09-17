@@ -8,42 +8,73 @@
 import { Type, type Static } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 
-export const githubSchema = Type.Object({
-	op: StringEnum([
-		"repo_view",
-		"file_read",
-		"pr_create",
-		"pr_checkout",
-		"pr_push",
-		"search_issues",
-		"search_prs",
-		"search_code",
-		"search_commits",
-		"search_repos",
-		"run_watch",
-	] as const, { description: "github operation" }),
-	repo: Type.Optional(Type.String({ description: "[host/]owner/repo" })),
-	branch: Type.Optional(Type.String({ description: "branch" })),
-	path: Type.Optional(Type.String({ description: "repository-relative file path" })),
-	pr: Type.Optional(Type.Union([Type.String(), Type.Array(Type.String())], { description: "pr number, url, or branch" })),
-	force: Type.Optional(Type.Boolean({ description: "reset existing local branch" })),
-	forceWithLease: Type.Optional(Type.Boolean({ description: "force-with-lease push" })),
-	title: Type.Optional(Type.String({ description: "pr title" })),
-	body: Type.Optional(Type.String({ description: "pr body markdown" })),
-	base: Type.Optional(Type.String({ description: "pr base branch" })),
-	head: Type.Optional(Type.String({ description: "pr head branch" })),
-	draft: Type.Optional(Type.Boolean({ description: "open pr as draft" })),
-	fill: Type.Optional(Type.Boolean({ description: "auto-fill pr title/body from commits" })),
-	reviewer: Type.Optional(Type.Array(Type.String(), { description: "reviewers" })),
-	assignee: Type.Optional(Type.Array(Type.String(), { description: "assignees" })),
-	label: Type.Optional(Type.Array(Type.String(), { description: "labels" })),
-	query: Type.Optional(Type.String({ description: "search query" })),
-	since: Type.Optional(Type.String({ description: "lower-bound date filter" })),
-	until: Type.Optional(Type.String({ description: "upper-bound date filter" })),
-	dateField: Type.Optional(StringEnum(["created", "updated"] as const, { description: "date field" })),
-	limit: Type.Optional(Type.Number({ description: "max results" })),
-	run: Type.Optional(Type.String({ description: "actions run id or url" })),
-	tail: Type.Optional(Type.Number({ description: "log lines per failed job" })),
+// The discriminated per-op union tightens requiredness (file_read.path,
+// pr_checkout.pr, search_code.query) so fabric full-code programs fail at
+// check time, not dispatch. Helper shorthands keep the serialized schema under
+// fabric's 4096-char captured-source cap — beyond it the captured-type channel
+// silently falls back to an untyped declaration (measured in
+// .scratch/fabric-compat/spike-report.md). Per-parameter descriptions live in
+// the tool description, which is the single source of per-op guidance; only
+// the tightened requireds carry schema text.
+const optString = () => Type.Optional(Type.String());
+const optBool = () => Type.Optional(Type.Boolean());
+const optNumber = () => Type.Optional(Type.Number());
+const optStringArray = () => Type.Optional(Type.Array(Type.String()));
+const format = () => Type.Optional(StringEnum(["text", "json"] as const));
+const dateParams = () => ({
+	since: optString(),
+	until: optString(),
+	dateField: Type.Optional(StringEnum(["created", "updated"] as const)),
+	limit: optNumber(),
 });
+const searchParams = () => ({ ...dateParams(), format: format() });
+
+export const githubSchema = Type.Union(
+	[
+		Type.Object({ op: Type.Literal("repo_view"), repo: optString(), branch: optString(), format: format() }),
+		Type.Object({
+			op: Type.Literal("file_read"),
+			repo: optString(),
+			branch: optString(),
+			path: Type.String({ description: "repository-relative file path (required)" }),
+			format: format(),
+		}),
+		Type.Object({
+			op: Type.Literal("pr_create"),
+			repo: optString(),
+			title: optString(),
+			body: optString(),
+			base: optString(),
+			head: optString(),
+			draft: optBool(),
+			fill: optBool(),
+			reviewer: optStringArray(),
+			assignee: optStringArray(),
+			label: optStringArray(),
+			format: format(),
+		}),
+		Type.Object({
+			op: Type.Literal("pr_checkout"),
+			repo: optString(),
+			pr: Type.Union([Type.String(), Type.Array(Type.String())], { description: "pr number, url, or branch (required)" }),
+			force: optBool(),
+			format: format(),
+		}),
+		Type.Object({ op: Type.Literal("pr_push"), repo: optString(), branch: optString(), forceWithLease: optBool(), format: format() }),
+		Type.Object({ op: Type.Literal("search_issues"), repo: optString(), query: optString(), ...searchParams() }),
+		Type.Object({ op: Type.Literal("search_prs"), repo: optString(), query: optString(), ...searchParams() }),
+		Type.Object({
+			op: Type.Literal("search_code"),
+			repo: optString(),
+			query: Type.String({ description: "search query (required)" }),
+			limit: optNumber(),
+			format: format(),
+		}),
+		Type.Object({ op: Type.Literal("search_commits"), repo: optString(), query: optString(), ...searchParams() }),
+		Type.Object({ op: Type.Literal("search_repos"), query: optString(), ...searchParams() }),
+		Type.Object({ op: Type.Literal("run_watch"), repo: optString(), branch: optString(), run: optString(), tail: optNumber(), format: format() }),
+	],
+	{ description: "github operation" },
+);
 
 export type GithubToolInput = Static<typeof githubSchema>;

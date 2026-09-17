@@ -17,6 +17,7 @@ import {
 	resolveGitHubRepo,
 } from "../refs.ts";
 import { buildTextResult, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, fileReadJsonPayload } from "../json.ts";
 import { ghJson } from "../runner.ts";
 import type { GithubInput } from "../types.ts";
 
@@ -117,6 +118,10 @@ export async function executeFileRead(
 	if (response.encoding !== "base64" || typeof response.content !== "string") {
 		const size =
 			typeof response.size === "number" && response.size >= 0 ? formatBytes(response.size) : "unknown size";
+		if (params.format === "json") {
+			// The json payload requires decoded content; there is nothing to envelope.
+			throw new ToolError(`GitHub did not return file bytes for '${filePath}' (${size}); json mode cannot read it. Open ${sourceUrl} to view it.`);
+		}
 		return buildTextResult(
 			`[GitHub did not return file bytes for '${filePath}' (${size}). Open ${sourceUrl} to view it.]`,
 			sourceUrl,
@@ -126,6 +131,31 @@ export async function executeFileRead(
 
 	const encoded = response.content.replaceAll(/\s/g, "");
 	const bytes = Buffer.from(encoded, "base64");
+	if (params.format === "json") {
+		// json mode is text-only: images and non-UTF-8 binaries fail with a clear
+		// ToolError instead of image/binary content. Text mode is unchanged.
+		const imageMetadata = parseImageMetadata(bytes);
+		if (imageMetadata) {
+			throw new ToolError(
+				`'${filePath}' is an image (${imageMetadata.mimeType}); json mode cannot return image content. Request it without format: "json" to receive the image.`,
+			);
+		}
+		if (isProbablyBinaryHeader(bytes.subarray(0, BINARY_SNIFF_BYTES))) {
+			throw new ToolError(`'${filePath}' is not valid UTF-8 text; json mode returns text files only.`);
+		}
+		let content: string;
+		try {
+			content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+		} catch {
+			throw new ToolError(`'${filePath}' is not valid UTF-8 text; json mode returns text files only.`);
+		}
+		return buildJsonResult("file_read", {
+			data: fileReadJsonPayload({ repo, branch, path: filePath, content }),
+			repo,
+			details: { repo, branch },
+			sourceUrl,
+		});
+	}
 	const imageMetadata = parseImageMetadata(bytes);
 	if (imageMetadata) {
 		const dimensions =

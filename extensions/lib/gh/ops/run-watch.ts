@@ -14,6 +14,7 @@ import * as path from "node:path";
 import { scheduler } from "node:timers/promises";
 import { ToolError, throwIfAborted } from "../../errors.ts";
 import { buildTextResult, formatShortSha, pushLine, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, runWatchJsonPayload } from "../json.ts";
 import {
 	formatRepoRef,
 	ghApiHostArgs,
@@ -515,15 +516,33 @@ export async function executeRunWatch(
 					signal,
 				);
 				const logFiles: string[] = [];
+				const logFilesByRun = new Map<number, string[]>();
 				for (const entry of failedJobLogs) {
 					if (entry.full) {
 						const file = await saveFailedJobLogsFile(entry.full, { runId: run.id, jobName: entry.job.name });
 						if (file) logFiles.push(file);
 					}
 				}
+				logFilesByRun.set(run.id, logFiles);
 				let text = formatRunWatchResult(repo, run, failedJobLogs, tail);
 				if (logFiles.length > 0) {
 					text += `\n\nFull failed-job logs: ${logFiles.join(", ")}`;
+				}
+				if (params.format === "json") {
+					return buildJsonResult("run_watch", {
+						data: runWatchJsonPayload({ runs: [run], logFilesByRun }),
+						repo,
+						details: {
+							repo,
+							runId: run.id,
+							runIds: [run.id],
+							status: run.status,
+							conclusion: run.conclusion,
+							failedJobs: run.jobs.filter(isFailedJob).map(job => job.name),
+							logFiles,
+						},
+						sourceUrl: run.url,
+					});
 				}
 				return buildTextResult(text, run.url, {
 					repo,
@@ -537,6 +556,14 @@ export async function executeRunWatch(
 			}
 
 			if (runCompleted) {
+				if (params.format === "json") {
+					return buildJsonResult("run_watch", {
+						data: runWatchJsonPayload({ runs: [run], logFilesByRun: new Map() }),
+						repo,
+						details: { repo, runId: run.id, runIds: [run.id], status: run.status, conclusion: run.conclusion },
+						sourceUrl: run.url,
+					});
+				}
 				return buildTextResult(formatRunWatchResult(repo, run, [], tail), run.url, {
 					repo,
 					runId: run.id,
@@ -623,15 +650,37 @@ export async function executeRunWatch(
 
 			const failedJobLogs = await fetchFailedJobLogs(cwd, repo, failedPairs, tail, signal);
 			const logFiles: string[] = [];
+			const logFilesByRun = new Map<number, string[]>();
 			for (const entry of failedJobLogs) {
 				if (entry.full) {
 					const file = await saveFailedJobLogsFile(entry.full, { runId: entry.run.id, jobName: entry.job.name });
-					if (file) logFiles.push(file);
+					if (file) {
+						logFiles.push(file);
+						const perRun = logFilesByRun.get(entry.run.id);
+						if (perRun) perRun.push(file);
+						else logFilesByRun.set(entry.run.id, [file]);
+					}
 				}
 			}
 			let text = formatCommitRunWatchResult(repo, headSha, branch, runs, failedJobLogs, tail);
 			if (logFiles.length > 0) {
 				text += `\n\nFull failed-job logs: ${logFiles.join(", ")}`;
+			}
+			if (params.format === "json") {
+				return buildJsonResult("run_watch", {
+					data: runWatchJsonPayload({ runs, logFilesByRun, branch, headSha }),
+					repo,
+					details: {
+						repo,
+						branch,
+						headSha,
+						runIds: runs.map(run => run.id),
+						status: "completed",
+						conclusion: "failure",
+						failedJobs: failedPairs.map(entry => `${entry.run.workflowName ?? `run ${entry.run.id}`}: ${entry.job.name}`),
+						logFiles,
+					},
+				});
 			}
 			return buildTextResult(text, undefined, {
 				repo,
@@ -648,6 +697,20 @@ export async function executeRunWatch(
 		if (outcome === "success") {
 			const signature = getRunCollectionSignature(runs);
 			if (signature === settledSuccessSignature) {
+				if (params.format === "json") {
+					return buildJsonResult("run_watch", {
+						data: runWatchJsonPayload({ runs, logFilesByRun: new Map(), branch, headSha }),
+						repo,
+						details: {
+						repo,
+						branch,
+						headSha,
+						runIds: runs.map(run => run.id),
+						status: "completed",
+						conclusion: "success",
+					},
+					});
+				}
 				return buildTextResult(formatCommitRunWatchResult(repo, headSha, branch, runs, [], tail), undefined, {
 					repo,
 					branch,
@@ -674,6 +737,13 @@ export async function executeRunWatch(
 			// A repo with no Actions configured never produces a run; give up
 			// with a clear message instead of polling forever.
 			const elapsedSec = Math.round((Date.now() - watchStartMs) / 1000);
+			if (params.format === "json") {
+				return buildJsonResult("run_watch", {
+					data: runWatchJsonPayload({ runs: [], logFilesByRun: new Map(), branch, headSha }),
+					repo,
+					details: { repo, branch, headSha, status: "completed" },
+				});
+			}
 			return buildTextResult(
 				`No workflow runs found for ${repo}@${formatShortSha(headSha) ?? headSha} after ${elapsedSec}s (${pollCount} polls). The commit may not trigger any GitHub Actions workflows, or Actions may be disabled for this repository. Pass \`run\` to watch a specific run.`,
 				undefined,

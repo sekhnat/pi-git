@@ -11,6 +11,7 @@
 import { ToolError } from "../../errors.ts";
 import { formatAuthor, formatLabels, normalizeOptionalString, normalizeText, parseRepoRef, requireNonEmpty, tryResolveCurrentRepo } from "../refs.ts";
 import { buildTextResult, pushLine, formatShortSha, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, searchJsonPayload } from "../json.ts";
 import type {
 	GhApiLabel,
 	GhApiSearchCodeItem,
@@ -358,6 +359,13 @@ export async function executeSearchIssues(cwd: string, params: GithubInput, sign
 
 	const response = await ghJson<GhApiSearchResponse<GhApiSearchIssueItem>>(cwd, args, signal);
 	const items = (response.items ?? []).map(apiIssueToSearchResult);
+	if (params.format === "json") {
+		return buildJsonResult("search_issues", {
+			data: searchJsonPayload({ totalCount: response.total_count, incompleteResults: response.incomplete_results, items }),
+			repo,
+			details: { repo },
+		});
+	}
 	return buildTextResult(formatSearchResults("issues", displayQuery, repo, items), undefined, { repo });
 }
 
@@ -373,6 +381,13 @@ export async function executeSearchPrs(cwd: string, params: GithubInput, signal:
 
 	const response = await ghJson<GhApiSearchResponse<GhApiSearchIssueItem>>(cwd, args, signal);
 	const items = (response.items ?? []).map(apiIssueToSearchResult);
+	if (params.format === "json") {
+		return buildJsonResult("search_prs", {
+			data: searchJsonPayload({ totalCount: response.total_count, incompleteResults: response.incomplete_results, items }),
+			repo,
+			details: { repo },
+		});
+	}
 	return buildTextResult(formatSearchResults("pull requests", displayQuery, repo, items), undefined, { repo });
 }
 
@@ -394,6 +409,13 @@ export async function executeSearchCode(cwd: string, params: GithubInput, signal
 
 	const response = await ghJson<GhApiSearchResponse<GhApiSearchCodeItem>>(cwd, args, signal);
 	const items = (response.items ?? []).map(apiCodeToSearchResult);
+	if (params.format === "json") {
+		return buildJsonResult("search_code", {
+			data: searchJsonPayload({ totalCount: response.total_count, incompleteResults: response.incomplete_results, items }),
+			repo,
+			details: { repo },
+		});
+	}
 	return buildTextResult(formatSearchCodeResults(query, repo, items), undefined, { repo });
 }
 
@@ -409,6 +431,13 @@ export async function executeSearchCommits(cwd: string, params: GithubInput, sig
 
 	const response = await ghJson<GhApiSearchResponse<GhApiSearchCommitItem>>(cwd, args, signal);
 	const items = (response.items ?? []).map(apiCommitToSearchResult);
+	if (params.format === "json") {
+		return buildJsonResult("search_commits", {
+			data: searchJsonPayload({ totalCount: response.total_count, incompleteResults: response.incomplete_results, items }),
+			repo,
+			details: { repo },
+		});
+	}
 	return buildTextResult(formatSearchCommitsResults(displayQuery, repo, items), undefined, { repo });
 }
 
@@ -421,5 +450,10 @@ export async function executeSearchRepos(cwd: string, params: GithubInput, signa
 
 	const response = await ghJson<GhApiSearchResponse<GhApiSearchRepoItem>>(cwd, args, signal);
 	const items = (response.items ?? []).map(apiRepoToSearchResult);
+	if (params.format === "json") {
+		return buildJsonResult("search_repos", {
+			data: searchJsonPayload({ totalCount: response.total_count, incompleteResults: response.incomplete_results, items }),
+		});
+	}
 	return buildTextResult(formatSearchReposResults(query, items), undefined, {});
 }

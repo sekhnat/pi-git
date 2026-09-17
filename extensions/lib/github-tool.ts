@@ -9,7 +9,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { renderGithubCallSummary, type GhToolDetails } from "./gh/format.ts";
 import { ghAvailable } from "./gh/runner.ts";
-import { githubSchema, type GithubToolInput } from "./gh/schema.ts";
+import { githubSchema } from "./gh/schema.ts";
+import type { GithubInput } from "./gh/types.ts";
 import { executeFileRead } from "./gh/ops/file-read.ts";
 import { executeRepoView } from "./gh/ops/repo-view.ts";
 import {
@@ -49,6 +50,7 @@ const GITHUB_TOOL_DESCRIPTION = [
 	"",
 	"<output>",
 	"Concise summary per op. `run_watch` failures save full logs to a temp file and report its path.",
+	"`format: \"json\"` returns a machine-readable `{ op, repo?, data }` envelope instead of the rendered text.",
 	"</output>",
 	"",
 	"<critical>",
@@ -70,7 +72,10 @@ export function registerGithubTool(pi: ExtensionAPI): boolean {
 		],
 		parameters: githubSchema,
 
-		async execute(_toolCallId, params: GithubToolInput, signal, onUpdate, ctx) {
+		// Executors consume the flat normalized input; the union schema is the
+		// validation/check-time surface (Static<typeof githubSchema> is assignable
+		// to it, and the exhaustive switch keeps narrowing params.op to never).
+		async execute(_toolCallId, params: GithubInput, signal, onUpdate, ctx) {
 			const runWatchContext: RunWatchContext = {
 				cwd: ctx.cwd,
 				onUpdate: update => {

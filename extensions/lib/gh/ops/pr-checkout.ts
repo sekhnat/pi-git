@@ -43,6 +43,7 @@ import {
 import { ghJson } from "../runner.ts";
 import type { GhPrViewData, GhRepoViewData, GithubInput } from "../types.ts";
 import { buildTextResult } from "../format.ts";
+import { buildJsonResult, prCheckoutJsonPayload } from "../json.ts";
 
 export const GH_PR_CHECKOUT_FIELDS = [
 	"baseRefName",
@@ -352,6 +353,14 @@ export async function executePrCheckout(
 		const sections = outcomes.map(formatPrCheckoutResult);
 		const header = `# ${outcomes.length}/${settled.length} Pull Request Worktrees checked out (${failures.length} failed)`;
 		const text = [header, "", ...joinSections(sections), "", "## Failed", ...failureLines].join("\n").trim();
+		if (params.format === "json") {
+			// Partial success: envelope the worktrees that did get created.
+			return buildJsonResult("pr_checkout", {
+				data: prCheckoutJsonPayload(outcomes.map(outcomeToSummary)),
+				repo,
+				details: { repo, checkouts: outcomes.map(outcomeToSummary) },
+			});
+		}
 		return buildTextResult(text, undefined, {
 			repo,
 			checkouts: outcomes.map(outcomeToSummary),
@@ -360,6 +369,21 @@ export async function executePrCheckout(
 
 	if (!isMulti) {
 		const [outcome] = outcomes;
+		if (params.format === "json") {
+			return buildJsonResult("pr_checkout", {
+				data: prCheckoutJsonPayload([outcomeToSummary(outcome)]),
+				repo: repo ?? outcome.data.headRepository?.nameWithOwner,
+				details: {
+					repo: repo ?? outcome.data.headRepository?.nameWithOwner,
+					branch: outcome.localBranch,
+					worktreePath: outcome.worktreePath,
+					remote: outcome.remoteName,
+					remoteBranch: outcome.headRefName,
+					checkouts: [outcomeToSummary(outcome)],
+				},
+				sourceUrl: outcome.data.url,
+			});
+		}
 		return buildTextResult(formatPrCheckoutResult(outcome), outcome.data.url, {
 			repo: repo ?? outcome.data.headRepository?.nameWithOwner,
 			branch: outcome.localBranch,
@@ -379,6 +403,13 @@ export async function executePrCheckout(
 	const header = `# ${outcomes.length} Pull Request Worktrees (${headerParts.join(", ")})`;
 	const text = [header, "", ...joinSections(sections)].join("\n").trim();
 
+	if (params.format === "json") {
+		return buildJsonResult("pr_checkout", {
+			data: prCheckoutJsonPayload(outcomes.map(outcomeToSummary)),
+			repo,
+			details: { repo, checkouts: outcomes.map(outcomeToSummary) },
+		});
+	}
 	return buildTextResult(text, undefined, {
 		repo,
 		checkouts: outcomes.map(outcomeToSummary),

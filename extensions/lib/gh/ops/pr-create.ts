@@ -10,6 +10,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { ToolError } from "../../errors.ts";
 import { buildTextResult, pushLine, type GhToolDetails } from "../format.ts";
+import { buildJsonResult, prCreateJsonPayload } from "../json.ts";
 import {
 	appendRepoFlag,
 	formatAuthor,
@@ -112,6 +113,14 @@ export async function executePrCreate(
 		}
 
 		const text = formatPrCreateResult({ url, prNumber: parsed.prNumber, data: prView, title, base, head, draft });
+		if (params.format === "json") {
+			return buildJsonResult("pr_create", {
+				data: prCreateJsonPayload({ url, prNumber: parsed.prNumber, data: prView, base, head, draft }),
+				repo: resolvedRepo,
+				details: { repo: resolvedRepo },
+				sourceUrl: url || prView?.url,
+			});
+		}
 		return buildTextResult(text, url || prView?.url, { repo: resolvedRepo });
 	} finally {
 		if (bodyDir) {
